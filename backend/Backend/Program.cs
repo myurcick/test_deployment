@@ -50,7 +50,7 @@ builder.Services.AddSwaggerGen(c =>
 
 // EF Core
 var conn = builder.Configuration.GetConnectionString("DefaultConnection") ??
-           "Server=/cloudsql/profkomweb:europe-central2:profkom-instance;Database=profkomdb;Uid=root;Pwd=root;";
+           "Server=profkomlnu-server;Database=profkomdb;Uid=seavotgupm;Pwd=DBkN9Ww8Lra$jKjC;";
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(conn, ServerVersion.AutoDetect(conn))
