@@ -50,7 +50,7 @@ builder.Services.AddSwaggerGen(c =>
 
 // EF Core
 var conn = builder.Configuration.GetConnectionString("DefaultConnection") ??
-           "hostname=profkomlnu-server.mysql.database.azure.com;port=3306;username=seavotgupm;password=DBkN9Ww8Lra$jKjC;";
+           "hostname=profkomlnu-server.mysql.database.azure.com;port=3306;database=profkomdb;username=seavotgupm;password=DBkN9Ww8Lra$jKjC;";
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(conn, ServerVersion.AutoDetect(conn))
