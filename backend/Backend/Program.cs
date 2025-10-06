@@ -108,14 +108,13 @@ builder.WebHost.UseKestrel(options =>
 
 var app = builder.Build();
 
-// Ensure DB created and seed (async)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     try
     {
-        await db.Database.EnsureCreatedAsync();
-        await DbInitializer.SeedAsync(db);
+        db.Database.EnsureCreated();  // синхронно
+        DbInitializer.Seed(db);       // синхронно
         Console.WriteLine("? Database initialized successfully");
     }
     catch (Exception ex)
@@ -123,6 +122,7 @@ using (var scope = app.Services.CreateScope())
         Console.WriteLine($"? Database initialization failed: {ex.Message}");
     }
 }
+
 
 // Middleware
 if (app.Environment.IsDevelopment() || true)
