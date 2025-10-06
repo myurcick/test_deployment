@@ -12,6 +12,6 @@ EXPOSE 8080
 
 # Копіюємо всі публішені файли
 COPY . .
-
+RUN mkdir -p /home/site/wwwroot/uploads
 # Запускаємо додаток
 ENTRYPOINT ["dotnet", "Backend.dll"]
