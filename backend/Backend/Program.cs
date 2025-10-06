@@ -8,10 +8,14 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Визначаємо шлях до uploads у wwwroot
-var uploadPath = Path.Combine(builder.Environment.WebRootPath ?? "wwwroot", "uploads");
+// Абсолютний шлях до wwwroot/uploads
+var wwwRoot = builder.Environment.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+if (!Directory.Exists(wwwRoot))
+{
+    Directory.CreateDirectory(wwwRoot);
+}
 
-// Створюємо папку, якщо її немає
+var uploadPath = Path.Combine(wwwRoot, "uploads");
 Directory.CreateDirectory(uploadPath);
 Console.WriteLine($"Uploads folder ensured at {uploadPath}");
 
@@ -58,7 +62,6 @@ builder.Services.AddSwaggerGen(c =>
 // EF Core
 var conn = builder.Configuration.GetConnectionString("DefaultConnection") ??
            "Server=profkomlnu-server.mysql.database.azure.com;port=3306;database=profkomdb;username=seavotgupm;password=DBkN9Ww8Lra$jKjC;";
-
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(conn, ServerVersion.AutoDetect(conn))
            .EnableSensitiveDataLogging()
@@ -81,47 +84,20 @@ var jwtKey = builder.Configuration["Jwt:Key"] ?? "profkomoflvivuniarethebestprof
 var key = Encoding.UTF8.GetBytes(jwtKey);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-.AddJwtBearer(options =>
-{
-    options.RequireHttpsMetadata = false;
-    options.SaveToken = true;
-    options.TokenValidationParameters = new TokenValidationParameters
+    .AddJwtBearer(options =>
     {
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(key),
-        ValidateIssuer = false,
-        ValidateAudience = false,
-        ValidateLifetime = true,
-        ClockSkew = TimeSpan.FromMinutes(5)
-    };
-
-    // Детальний дебаг
-    options.Events = new JwtBearerEvents
-    {
-        OnMessageReceived = context =>
+        options.RequireHttpsMetadata = false;
+        options.SaveToken = true;
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            var token = context.Request.Headers["Authorization"].FirstOrDefault()?.Split(" ").Last();
-            Console.WriteLine($"=== JWT DEBUG === Authorization: {context.Request.Headers["Authorization"]}, Token: {token}");
-            return Task.CompletedTask;
-        },
-        OnTokenValidated = context =>
-        {
-            var claims = context.Principal?.Claims.Select(c => $"{c.Type}: {c.Value}");
-            Console.WriteLine($"? Token validated successfully. Claims: {string.Join(", ", claims ?? new string[0])}");
-            return Task.CompletedTask;
-        },
-        OnAuthenticationFailed = context =>
-        {
-            Console.WriteLine($"? Authentication failed: {context.Exception.Message}");
-            return Task.CompletedTask;
-        },
-        OnChallenge = context =>
-        {
-            Console.WriteLine($"?? JWT Challenge: {context.Error}, {context.ErrorDescription}");
-            return Task.CompletedTask;
-        }
-    };
-});
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(key),
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(5)
+        };
+    });
 
 // Kestrel
 builder.WebHost.UseKestrel(options =>
@@ -132,18 +108,14 @@ builder.WebHost.UseKestrel(options =>
 
 var app = builder.Build();
 
-// Асинхронна ініціалізація бази даних
+// --- База даних без змін ---
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     try
     {
-        // Синхронне створення бази
         db.Database.EnsureCreated();
-
-        // Синхронний seed
         DbInitializer.Seed(db);
-
         Console.WriteLine("? Database initialized successfully");
     }
     catch (Exception ex)
@@ -153,17 +125,13 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Middleware
-if (app.Environment.IsDevelopment() || true)
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Profkom API v1");
-        c.RoutePrefix = string.Empty;
-    });
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Profkom API v1");
+    c.RoutePrefix = string.Empty;
+});
 
-// Logging middleware
 app.Use(async (context, next) =>
 {
     Console.WriteLine($"=== REQUEST === {context.Request.Method} {context.Request.Path}");
