@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -7,8 +7,9 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
-// Визначаємо шлях до uploads
-var uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "Backend", "uploads");
+
+// Визначаємо шлях до uploads у wwwroot
+var uploadPath = Path.Combine(builder.Environment.WebRootPath ?? "wwwroot", "uploads");
 
 // Створюємо папку, якщо її немає
 if (!Directory.Exists(uploadPath))
@@ -16,7 +17,7 @@ if (!Directory.Exists(uploadPath))
     Directory.CreateDirectory(uploadPath);
     Console.WriteLine($"Uploads folder created at {uploadPath}");
 }
-// Використовуємо у FileProvider
+
 // Add services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -80,7 +81,6 @@ builder.Services.AddCors(options =>
 
 // JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "profkomoflvivuniarethebestprofkominworld";
-Console.WriteLine($"JWT Key: {jwtKey}");
 var key = Encoding.UTF8.GetBytes(jwtKey);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -95,57 +95,27 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         ValidateIssuer = false,
         ValidateAudience = false,
         ValidateLifetime = true,
-        ClockSkew = TimeSpan.FromMinutes(5) // Збільшуємо допустиме відхилення часу
-    };
-
-    // Детальний дебаг
-    options.Events = new JwtBearerEvents
-    {
-        OnMessageReceived = context =>
-        {
-            var token = context.Request.Headers["Authorization"].FirstOrDefault()?.Split(" ").Last();
-            Console.WriteLine($"=== JWT DEBUG ===");
-            Console.WriteLine($"Authorization Header: {context.Request.Headers["Authorization"]}");
-            Console.WriteLine($"Token: {token}");
-            return Task.CompletedTask;
-        },
-        OnTokenValidated = context =>
-        {
-            Console.WriteLine("? Token validated successfully");
-            var claims = context.Principal?.Claims.Select(c => $"{c.Type}: {c.Value}");
-            Console.WriteLine($"Claims: {string.Join(", ", claims ?? new string[0])}");
-            return Task.CompletedTask;
-        },
-        OnAuthenticationFailed = context =>
-        {
-            Console.WriteLine($"? Authentication failed: {context.Exception.Message}");
-            Console.WriteLine($"Exception: {context.Exception}");
-            return Task.CompletedTask;
-        },
-        OnChallenge = context =>
-        {
-            Console.WriteLine($"?? JWT Challenge: {context.Error}, {context.ErrorDescription}");
-            return Task.CompletedTask;
-        }
+        ClockSkew = TimeSpan.FromMinutes(5)
     };
 });
+
+// Kestrel
 builder.WebHost.UseKestrel(options =>
 {
     var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-    options.ListenAnyIP(int.Parse(port));  // Слухаємо на 0.0.0.0:$PORT
+    options.ListenAnyIP(int.Parse(port));
 });
 
 var app = builder.Build();
 
-
-// Ensure DB created and seed
+// Ensure DB created and seed (async)
 using (var scope = app.Services.CreateScope())
 {
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     try
     {
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        db.Database.EnsureCreated();
-        DbInitializer.Seed(db);
+        await db.Database.EnsureCreatedAsync();
+        await DbInitializer.SeedAsync(db);
         Console.WriteLine("? Database initialized successfully");
     }
     catch (Exception ex)
@@ -155,7 +125,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Middleware
-if (app.Environment.IsDevelopment() || true) // Завжди показувати Swagger
+if (app.Environment.IsDevelopment() || true)
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
@@ -165,17 +135,15 @@ if (app.Environment.IsDevelopment() || true) // Завжди показуват�
     });
 }
 
-// Додаємо middleware для логування всіх запитів
+// Logging middleware
 app.Use(async (context, next) =>
 {
-    Console.WriteLine($"=== REQUEST ===");
-    Console.WriteLine($"{context.Request.Method} {context.Request.Path}");
-    Console.WriteLine($"Headers: {string.Join(", ", context.Request.Headers.Select(h => $"{h.Key}:{h.Value}"))}");
+    Console.WriteLine($"=== REQUEST === {context.Request.Method} {context.Request.Path}");
     await next();
-    Console.WriteLine($"Response: {context.Response.StatusCode}");
+    Console.WriteLine($"=== RESPONSE === {context.Response.StatusCode}");
 });
 
-app.UseCors("AllowFrontend");
+app.UseCors("AllowAll");
 
 app.UseStaticFiles(new StaticFileOptions
 {
@@ -185,14 +153,8 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new PhysicalFileProvider(uploadPath),
-    RequestPath = "/Uploads"
-});
+
 app.MapControllers();
 
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-
 app.Run($"http://0.0.0.0:{port}");
-Console.WriteLine($"?? Application starting on port: {port}");
