@@ -9,15 +9,8 @@ using Microsoft.OpenApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 // === Абсолютний шлях до wwwroot/uploads ===
-var wwwRoot = builder.Environment.WebRootPath;
-if (string.IsNullOrEmpty(wwwRoot))
-{
-    wwwRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-    Directory.CreateDirectory(wwwRoot); // створюємо wwwroot, якщо немає
-}
-var uploadPath = Path.Combine(wwwRoot, "uploads");
-Directory.CreateDirectory(uploadPath); // створюємо uploads, якщо немає
-Console.WriteLine($"Uploads folder ensured at {uploadPath}");
+var uploadPath = "/home/site/wwwroot/uploads";
+Directory.CreateDirectory(uploadPath);
 
 // === Services ===
 builder.Services.AddControllers();
