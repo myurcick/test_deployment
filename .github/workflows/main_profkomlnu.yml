@@ -22,7 +22,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.x'
-
+      - name: Create uploads folder
+        run: |
+          mkdir -p Backend/uploads
+          echo "Uploads folder created at $(pwd)/Backend/uploads"
       - name: Build with dotnet
         run: dotnet build --configuration Release
         working-directory: ./backend
@@ -64,4 +67,5 @@ jobs:
           package: .
 
           
+
 
