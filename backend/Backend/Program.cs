@@ -12,11 +12,8 @@ var builder = WebApplication.CreateBuilder(args);
 var uploadPath = Path.Combine(builder.Environment.WebRootPath ?? "wwwroot", "uploads");
 
 // Створюємо папку, якщо її немає
-if (!Directory.Exists(uploadPath))
-{
-    Directory.CreateDirectory(uploadPath);
-    Console.WriteLine($"Uploads folder created at {uploadPath}");
-}
+Directory.CreateDirectory(uploadPath);
+Console.WriteLine($"Uploads folder ensured at {uploadPath}");
 
 // Add services
 builder.Services.AddControllers();
@@ -32,7 +29,7 @@ builder.Services.AddSwaggerGen(c =>
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
+        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token.",
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
@@ -97,6 +94,33 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         ValidateLifetime = true,
         ClockSkew = TimeSpan.FromMinutes(5)
     };
+
+    // Детальний дебаг
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var token = context.Request.Headers["Authorization"].FirstOrDefault()?.Split(" ").Last();
+            Console.WriteLine($"=== JWT DEBUG === Authorization: {context.Request.Headers["Authorization"]}, Token: {token}");
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            var claims = context.Principal?.Claims.Select(c => $"{c.Type}: {c.Value}");
+            Console.WriteLine($"? Token validated successfully. Claims: {string.Join(", ", claims ?? new string[0])}");
+            return Task.CompletedTask;
+        },
+        OnAuthenticationFailed = context =>
+        {
+            Console.WriteLine($"? Authentication failed: {context.Exception.Message}");
+            return Task.CompletedTask;
+        },
+        OnChallenge = context =>
+        {
+            Console.WriteLine($"?? JWT Challenge: {context.Error}, {context.ErrorDescription}");
+            return Task.CompletedTask;
+        }
+    };
 });
 
 // Kestrel
@@ -108,13 +132,14 @@ builder.WebHost.UseKestrel(options =>
 
 var app = builder.Build();
 
+// Асинхронна ініціалізація бази даних
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     try
     {
-        db.Database.EnsureCreated();  // синхронно
-        DbInitializer.Seed(db);       // синхронно
+        await db.Database.EnsureCreatedAsync();  // async
+        await DbInitializer.SeedAsync(db);       // async
         Console.WriteLine("? Database initialized successfully");
     }
     catch (Exception ex)
@@ -122,7 +147,6 @@ using (var scope = app.Services.CreateScope())
         Console.WriteLine($"? Database initialization failed: {ex.Message}");
     }
 }
-
 
 // Middleware
 if (app.Environment.IsDevelopment() || true)
