@@ -7,7 +7,16 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+// Визначаємо шлях до uploads
+var uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "Backend", "uploads");
 
+// Створюємо папку, якщо її немає
+if (!Directory.Exists(uploadPath))
+{
+    Directory.CreateDirectory(uploadPath);
+    Console.WriteLine($"Uploads folder created at {uploadPath}");
+}
+// Використовуємо у FileProvider
 // Add services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -50,7 +59,7 @@ builder.Services.AddSwaggerGen(c =>
 
 // EF Core
 var conn = builder.Configuration.GetConnectionString("DefaultConnection") ??
-           "Server=/cloudsql/profkomweb:europe-central2:profkom-instance;Database=profkomdb;Uid=root;Pwd=root;";
+           "Server=profkomlnu-server.mysql.database.azure.com;port=3306;database=profkomdb;username=seavotgupm;password=DBkN9Ww8Lra$jKjC;";
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(conn, ServerVersion.AutoDetect(conn))
@@ -170,7 +179,7 @@ app.UseCors("AllowFrontend");
 
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "uploads")),
+    FileProvider = new PhysicalFileProvider(uploadPath),
     RequestPath = "/uploads"
 });
 
@@ -178,7 +187,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "Uploads")),
+    FileProvider = new PhysicalFileProvider(uploadPath),
     RequestPath = "/Uploads"
 });
 app.MapControllers();
