@@ -7,7 +7,11 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
-
+var uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "Backend", "uploads");
+if (!Directory.Exists(uploadPath))
+{
+    Directory.CreateDirectory(uploadPath);
+}
 // Add services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
