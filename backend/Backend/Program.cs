@@ -138,8 +138,12 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     try
     {
-        await db.Database.EnsureCreated();  // async
-        await DbInitializer.Seed(db);       // async
+        // Синхронне створення бази
+        db.Database.EnsureCreated();
+
+        // Синхронний seed
+        DbInitializer.Seed(db);
+
         Console.WriteLine("? Database initialized successfully");
     }
     catch (Exception ex)
