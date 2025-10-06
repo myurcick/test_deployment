@@ -8,18 +8,18 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Абсолютний шлях до wwwroot/uploads
-var wwwRoot = builder.Environment.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-if (!Directory.Exists(wwwRoot))
+// === Абсолютний шлях до wwwroot/uploads ===
+var wwwRoot = builder.Environment.WebRootPath;
+if (string.IsNullOrEmpty(wwwRoot))
 {
-    Directory.CreateDirectory(wwwRoot);
+    wwwRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+    Directory.CreateDirectory(wwwRoot); // створюємо wwwroot, якщо немає
 }
-
 var uploadPath = Path.Combine(wwwRoot, "uploads");
-Directory.CreateDirectory(uploadPath);
+Directory.CreateDirectory(uploadPath); // створюємо uploads, якщо немає
 Console.WriteLine($"Uploads folder ensured at {uploadPath}");
 
-// Add services
+// === Services ===
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -59,16 +59,17 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// EF Core
+// === EF Core ===
 var conn = builder.Configuration.GetConnectionString("DefaultConnection") ??
            "Server=profkomlnu-server.mysql.database.azure.com;port=3306;database=profkomdb;username=seavotgupm;password=DBkN9Ww8Lra$jKjC;";
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(conn, ServerVersion.AutoDetect(conn))
            .EnableSensitiveDataLogging()
            .EnableDetailedErrors()
 );
 
-// CORS
+// === CORS ===
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -79,7 +80,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-// JWT Authentication
+// === JWT Authentication ===
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "profkomoflvivuniarethebestprofkominworld";
 var key = Encoding.UTF8.GetBytes(jwtKey);
 
@@ -97,9 +98,36 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(5)
         };
+
+        // Детальний дебаг
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var token = context.Request.Headers["Authorization"].FirstOrDefault()?.Split(" ").Last();
+                Console.WriteLine($"=== JWT DEBUG === Authorization: {context.Request.Headers["Authorization"]}, Token: {token}");
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                var claims = context.Principal?.Claims.Select(c => $"{c.Type}: {c.Value}");
+                Console.WriteLine($"? Token validated successfully. Claims: {string.Join(", ", claims ?? new string[0])}");
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine($"? Authentication failed: {context.Exception.Message}");
+                return Task.CompletedTask;
+            },
+            OnChallenge = context =>
+            {
+                Console.WriteLine($"?? JWT Challenge: {context.Error}, {context.ErrorDescription}");
+                return Task.CompletedTask;
+            }
+        };
     });
 
-// Kestrel
+// === Kestrel ===
 builder.WebHost.UseKestrel(options =>
 {
     var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
@@ -108,7 +136,7 @@ builder.WebHost.UseKestrel(options =>
 
 var app = builder.Build();
 
-// --- База даних без змін ---
+// === Database initialization (без змін) ===
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -124,14 +152,18 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Middleware
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+// === Middleware ===
+if (app.Environment.IsDevelopment() || true)
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Profkom API v1");
-    c.RoutePrefix = string.Empty;
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Profkom API v1");
+        c.RoutePrefix = string.Empty;
+    });
+}
 
+// Logging middleware
 app.Use(async (context, next) =>
 {
     Console.WriteLine($"=== REQUEST === {context.Request.Method} {context.Request.Path}");
@@ -141,6 +173,7 @@ app.Use(async (context, next) =>
 
 app.UseCors("AllowAll");
 
+// Static files (uploads)
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(uploadPath),
@@ -152,5 +185,6 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// === Run ===
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 app.Run($"http://0.0.0.0:{port}");
