@@ -14,10 +14,9 @@ var uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "Backend", "uploa
 if (!Directory.Exists(uploadPath))
 {
     Directory.CreateDirectory(uploadPath);
+    Console.WriteLine($"Uploads folder created at {uploadPath}");
 }
-
 // Використовуємо у FileProvider
-var provider = new PhysicalFileProvider(uploadPath);
 // Add services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -180,7 +179,7 @@ app.UseCors("AllowFrontend");
 
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "uploads")),
+    FileProvider = new PhysicalFileProvider(uploadPath),
     RequestPath = "/uploads"
 });
 
@@ -188,7 +187,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "Uploads")),
+    FileProvider = new PhysicalFileProvider(uploadPath),
     RequestPath = "/Uploads"
 });
 app.MapControllers();
